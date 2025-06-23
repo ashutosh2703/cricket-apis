@@ -1,8 +1,14 @@
 const express = require("express");
 const cors = require('cors');
 const app = express();
+const multer = require("multer");
+const upload = multer();
+
+app.use(upload.none());
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 app.use(
   cors({
     origin: "*",
