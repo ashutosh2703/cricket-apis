@@ -98,6 +98,27 @@ const fetchRecentMatchesBySeriesId = async (seriesId) => {
   }
 };
 
+const fetchSquadsBySeriesId = async (seriesId) => {
+  try {
+    const formData = createFormData({ series_id: seriesId });
+
+    const response = await axios.post(
+      `${BASE_URL}/squadsBySeriesId/${API_KEY}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching squads:', error.message);
+    return null;
+  }
+};
+
+
 const fetchLiveMatchList = async () => {
   try {
     const response = await axios.get(`${BASE_URL}/liveMatchList/${API_KEY}`);
@@ -808,5 +829,6 @@ module.exports = {
   fetchTeamComparison,
   fetchTossComparison,
   fetchRecentMatchesByVenueId,
-  fetchSeriesStats
+  fetchSeriesStats,
+  fetchSquadsBySeriesId
 };

@@ -56,7 +56,8 @@ const {
   fetchTeamComparison,
   fetchTossComparison,
   fetchRecentMatchesByVenueId,
-  fetchSeriesStats
+  fetchSeriesStats,
+  fetchSquadsBySeriesId
 } = require("./api");
 
 // Welcome route
@@ -134,6 +135,22 @@ app.post("/api/upcoming-matches-by-series", async (req, res) => {
     res.status(500).send({ error: "Failed to fetch upcoming matches by series" });
   }
 });
+
+app.post("/api/squads-by-series", async (req, res) => {
+  try {
+    const { series_id } = req.body;
+
+    if (!series_id) {
+      return res.status(400).send({ error: "series_id is required" });
+    }
+
+    const data = await fetchSquadsBySeriesId(series_id);
+    res.status(200).send(data);
+  } catch (error) {
+    res.status(500).send({ error: "Failed to fetch squads by series" });
+  }
+});
+
 
 app.post("/api/recent-matches-by-series", async (req, res) => {
   try {
