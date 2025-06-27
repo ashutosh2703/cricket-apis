@@ -3,9 +3,20 @@ const cors = require('cors');
 const app = express();
 const multer = require("multer");
 const upload = multer();
+const http = require("http");
+const server = http.createServer(app);
+
+const { Server } = require("socket.io");
+
+const io = new Server(server, {
+  cors: {
+    origin: "*",     
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 app.use(upload.none());
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -59,6 +70,97 @@ const {
   fetchSeriesStats,
   fetchSquadsBySeriesId
 } = require("./api");
+
+let liveMatchIds = [];
+let liveMatchFetchInterval = null;
+const roomIntervals = {};
+
+async function fetchLiveMatchIds() {
+  try {
+    const liveMatches = await fetchLiveMatchList();
+    const newMatchIds = [];
+    
+    if (liveMatches && liveMatches.data && Array.isArray(liveMatches.data)) {
+      liveMatches.data.forEach(match => {
+        if (match.match_id || match.id) {
+          newMatchIds.push(match.match_id || match.id);
+        }
+      });
+    }
+    
+    liveMatchIds = [...new Set(newMatchIds)];
+    
+  } catch (error) {
+    console.error('Error fetching live matches:', error);
+  }
+}
+
+function startLiveMatchTracking() {
+  fetchLiveMatchIds();
+  liveMatchFetchInterval = setInterval(fetchLiveMatchIds, 2000);
+}
+
+
+io.on("connection", (socket) => {
+  socket.on("joinRoom", (matchId) => {
+
+    if (!liveMatchIds.includes(matchId.toString()) && !liveMatchIds.includes(parseInt(matchId))) {
+      socket.emit("error", { 
+        message: "Match is not currently live or match ID not found",
+        availableMatches: liveMatchIds 
+      });
+      return;
+    }
+    
+    socket.join(matchId);
+
+    if (!roomIntervals[matchId]) {
+      
+      roomIntervals[matchId] = setInterval(async () => {
+        try {
+          const data = await fetchLiveMatchByMatchId(matchId);
+          
+          io.to(matchId).emit("liveMatchData", {
+            matchId: matchId,
+            data: data,
+            timestamp: new Date().toISOString()
+          });
+          
+        } catch (error) {
+          console.error(`Error fetching live match data for ${matchId}:`, error);
+          
+          io.to(matchId).emit("liveMatchError", {
+            matchId: matchId,
+            error: "Failed to fetch live match data",
+            timestamp: new Date().toISOString()
+          });
+        }
+      }, 900);
+    }
+
+    socket.emit("joinedRoom", { 
+      matchId: matchId,
+      message: "Successfully joined live match room",
+      updateInterval: "900ms"
+    });
+    
+  });
+
+  socket.on("leaveRoom", (roomId) => {
+    socket.leave(roomId);
+    // clearInterval if no one left in room
+    if (io.sockets.adapter.rooms.get(roomId)?.size === 0) {
+      clearInterval(roomIntervals[roomId]);
+      delete roomIntervals[roomId];
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`Client disconnected: ${socket.id}`);
+  });
+});
+
+startLiveMatchTracking();
 
 // Welcome route
 app.get("/", (req, res) => {
@@ -605,4 +707,4 @@ app.use((err, req, res, next) => {
   });
 });
 
-module.exports = { app };
+module.exports = { server };
