@@ -102,8 +102,10 @@ function startLiveMatchTracking() {
 
 
 io.on("connection", (socket) => {
-  socket.on("joinRoom", (matchId) => {
-
+  console.log(`Client connected: ${socket.id}`);
+  socket.on("joinRoom", ({matchId}) => {
+    console.log(matchId);
+    
     if (!liveMatchIds.includes(matchId.toString()) && !liveMatchIds.includes(parseInt(matchId))) {
       socket.emit("error", { 
         message: "Match is not currently live or match ID not found",
@@ -148,7 +150,6 @@ io.on("connection", (socket) => {
 
   socket.on("leaveRoom", (roomId) => {
     socket.leave(roomId);
-    // clearInterval if no one left in room
     if (io.sockets.adapter.rooms.get(roomId)?.size === 0) {
       clearInterval(roomIntervals[roomId]);
       delete roomIntervals[roomId];
